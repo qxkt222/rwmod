@@ -12,7 +12,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from rwmod.database import close_db, init_db
@@ -78,8 +78,6 @@ async def log_request_timing(request: Request, call_next):
 
 
 # ── global error handler ───────────────────────────────────────────
-
-from fastapi.responses import JSONResponse
 
 
 @app.exception_handler(RwmodError)

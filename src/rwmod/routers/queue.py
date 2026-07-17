@@ -25,9 +25,12 @@ def queue_add(payload: dict, queue: DownloadQueue = Depends(get_queue)):
 
 @router.post("/queue/start")
 async def queue_start(
-    payload: dict = {}, cfg: Config = Depends(get_config), queue: DownloadQueue = Depends(get_queue)
+    payload: dict | None = None,
+    cfg: Config = Depends(get_config),
+    queue: DownloadQueue = Depends(get_queue),
 ):
-    force: bool = payload.get("force", False)
+    body = payload or {}
+    force: bool = body.get("force", False)
     cfg.validate()
     await queue.start(cfg, force=force)
     return {"ok": True}

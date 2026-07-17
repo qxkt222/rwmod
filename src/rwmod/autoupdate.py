@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 
 from rwmod.config import Config
@@ -41,10 +42,8 @@ class AutoUpdateManager:
     async def stop_background(self) -> None:
         if self._bg_task and not self._bg_task.done():
             self._bg_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._bg_task
-            except asyncio.CancelledError:
-                pass
 
     async def run_check(self) -> dict:
         """Manually trigger an update check and queue outdated mods."""

@@ -1,5 +1,7 @@
 """Config router."""
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends
 
 from rwmod.config import Config
@@ -32,6 +34,3 @@ def update_config(payload: dict, cfg: Config = Depends(get_config)):
         cfg.backup_dir = Path(payload["backup_dir"])
     cfg.save()
     return {"ok": True}
-
-
-from pathlib import Path

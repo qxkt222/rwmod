@@ -92,13 +92,19 @@ def init_db() -> None:
 
 
 def record_download(
-    workshop_id: str, status: str, mod_name: str = "", package_id: str = "", msg: str = ""
+    workshop_id: str,
+    status: str,
+    mod_name: str = "",
+    package_id: str = "",
+    msg: str = "",
 ) -> int:
     db = _get_conn()
-    cur = db.execute(
-        "INSERT INTO download_history (workshop_id, mod_name, package_id, status, msg) VALUES (?,?,?,?,?)",
-        (workshop_id, mod_name, package_id, status, msg),
+    sql = (
+        "INSERT INTO download_history"
+        " (workshop_id, mod_name, package_id, status, msg)"
+        " VALUES (?,?,?,?,?)"
     )
+    cur = db.execute(sql, (workshop_id, mod_name, package_id, status, msg))
     db.commit()
     return cur.lastrowid or -1
 

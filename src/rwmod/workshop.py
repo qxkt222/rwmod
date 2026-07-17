@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import urllib.parse
 import urllib.request
@@ -259,10 +260,8 @@ def _fetch_batch_parallel(mod_ids: list[str], batch_size: int = 100) -> dict[str
     with ThreadPoolExecutor(max_workers=min(len(batches), _MAX_WORKERS)) as executor:
         futures = {executor.submit(_fetch_batch, b): b for b in batches}
         for future in as_completed(futures):
-            try:
+            with contextlib.suppress(Exception):
                 result.update(future.result())
-            except Exception:
-                pass
     return result
 
 
@@ -317,10 +316,8 @@ def check_mod_updates(mods_dir: str) -> list[dict]:
         # Read locally stored timestamp
         local_time = 0
         if ts_file.exists():
-            try:
+            with contextlib.suppress(ValueError, OSError):
                 local_time = int(ts_file.read_text(encoding="utf-8").strip())
-            except (ValueError, OSError):
-                pass
 
         # First-time check: no local timestamp → seed it, don't flag as outdated
         if local_time == 0:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -62,10 +63,8 @@ class DownloadQueue:
     async def _notify(self) -> None:
         snapshot = self.snapshot()
         for cb in self._callbacks:
-            try:
+            with contextlib.suppress(Exception):
                 await cb(snapshot)
-            except Exception:
-                pass
 
     def snapshot(self) -> list[dict]:
         return [

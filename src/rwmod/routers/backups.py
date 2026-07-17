@@ -19,11 +19,14 @@ def list_backups(workshop_id: str = "", cfg: Config = Depends(get_config)):
 
 
 @router.post("/backups/{workshop_id}/restore")
-def restore_backup(workshop_id: str, payload: dict = {}, cfg: Config = Depends(get_config)):
+def restore_backup(
+    workshop_id: str, payload: dict | None = None, cfg: Config = Depends(get_config)
+):
     from rwmod.backup import restore_mod
 
+    body = payload or {}
     return restore_mod(
-        cfg.mods_dir, workshop_id, cfg.backup_dir, backup_filename=payload.get("filename")
+        cfg.mods_dir, workshop_id, cfg.backup_dir, backup_filename=body.get("filename")
     )
 
 
@@ -35,8 +38,9 @@ def delete_backup(filename: str, cfg: Config = Depends(get_config)):
 
 
 @router.post("/backups/cleanup")
-def cleanup_backups(payload: dict = {}, cfg: Config = Depends(get_config)):
+def cleanup_backups(payload: dict | None = None, cfg: Config = Depends(get_config)):
     from rwmod.backup import cleanup_backups
 
-    keep: int = payload.get("keep", 5)
+    body = payload or {}
+    keep: int = body.get("keep", 5)
     return {"ok": True, "deleted": cleanup_backups(cfg.backup_dir, keep_per_mod=keep)}
