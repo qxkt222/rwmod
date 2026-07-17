@@ -1,0 +1,54 @@
+# rwmod — RimWorld Mod Manager
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.spec
+
+# Virtual env
+.venv/
+venv/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Static output (built from frontend)
+static/assets/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Env
+.env
+.env.local
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# PyInstaller
+*.manifest
+
+# CI
+coverage.xml
+htmlcov/
+
+# SteamCMD (binary — not version controlled)
+steamcmd/

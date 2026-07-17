@@ -1,0 +1,33 @@
+# rwmod — Docker Compose (production)
+version: "3.9"
+
+services:
+  rwmod:
+    build: .
+    image: rwmod:latest
+    container_name: rwmod
+    ports:
+      - "8000:8000"
+    volumes:
+      # Built-in SteamCMD (host directory)
+      - ./steamcmd:/app/steamcmd:ro
+      # Mods directory — persistent
+      - mods_data:/app/mods
+      # Config persisted in volume
+      - rwmod_config:/home/rwmod
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/config')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mods_data:
+  rwmod_config:

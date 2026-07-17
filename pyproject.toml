@@ -1,0 +1,52 @@
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rwmod"]
+
+# ── pytest config ──────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v --tb=short --cov=rwmod --cov-report=term-missing --cov-report=html"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "network: marks tests requiring network access",
+]
+
+# ── mypy config ────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unused_ignores = true
+show_error_codes = true
+exclude = ["tests/", "build/", ".venv/"]
+[[tool.mypy.overrides]]
+module = ["rwmod.*"]
+disallow_untyped_defs = true
+
+# ── coverage config ────────────────────────────────────────────────
+[tool.coverage.run]
+source = ["src/rwmod"]
+omit = ["src/rwmod/routers/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+
+# ── bandit config ──────────────────────────────────────────────────
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "build", "dist", "node_modules"]
+skips = ["B101"]  # skip assert check (used in tests)
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+]
