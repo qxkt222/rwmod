@@ -1,5 +1,8 @@
 """Mods router — listing, health, compatibility, export, collection-export."""
 
+import time
+from typing import Any
+
 from fastapi import APIRouter, Depends
 
 from rwmod.config import Config
@@ -10,13 +13,19 @@ from rwmod.workshop import check_mod_updates, fetch_item_details
 
 router = APIRouter(prefix="/api/mods", tags=["mods"])
 
+# ── lightweight in-memory cache ───────────────────────────────────
+_mods_cache: dict[str, Any] = {}
+_CACHE_TTL = 3  # seconds
 
-@router.get("")
-def list_mods(cfg: Config = Depends(get_config)):
+
+def _cached_mod_list(cfg: Config) -> list[dict]:
+    now = time.time()
+    if _mods_cache and now - _mods_cache.get("_ts", 0) < _CACHE_TTL:
+        return _mods_cache["data"]
     if not cfg.mods_dir.exists():
         return []
     metas = get_cached_mods(cfg.mods_dir)
-    return [
+    data = [
         {
             "folder": m.folder,
             "name": m.name,
@@ -25,6 +34,14 @@ def list_mods(cfg: Config = Depends(get_config)):
         }
         for m in metas
     ]
+    _mods_cache["data"] = data
+    _mods_cache["_ts"] = now
+    return data
+
+
+@router.get("")
+def list_mods(cfg: Config = Depends(get_config)):
+    return _cached_mod_list(cfg)
 
 
 @router.get("/check-updates")
@@ -32,9 +49,16 @@ def check_updates(cfg: Config = Depends(get_config)):
     return {"updates": check_mod_updates(str(cfg.mods_dir))}
 
 
+# ── health cache (expensive — hits Steam API for 600+ mods) ───────
+_health_cache: dict[str, Any] = {}
+_HEALTH_CACHE_TTL = 60  # 1 minute — Steam API data changes slowly
+
+
 @router.get("/health")
 def mod_health(cfg: Config = Depends(get_config)):
-    import time
+    now = time.time()
+    if _health_cache and now - _health_cache.get("_ts", 0) < _HEALTH_CACHE_TTL:
+        return _health_cache["data"]
 
     if not cfg.mods_dir.exists():
         return {"mods": []}
@@ -45,7 +69,6 @@ def mod_health(cfg: Config = Depends(get_config)):
     ]
     all_ids = [m.workshop_id for m in metas]
     details = fetch_item_details(all_ids)
-    now = int(time.time())
     results = []
     for meta in metas:
         remote = details.get(meta.workshop_id)
@@ -64,7 +87,10 @@ def mod_health(cfg: Config = Depends(get_config)):
                 "last_updated": last_updated,
             }
         )
-    return {"mods": results}
+    data = {"mods": results}
+    _health_cache["data"] = data
+    _health_cache["_ts"] = now
+    return data
 
 
 @router.get("/export")

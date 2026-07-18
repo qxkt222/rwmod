@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import logging
 import re
 import shutil
@@ -9,6 +10,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 import zipfile
+from contextlib import suppress
 from pathlib import Path
 
 __all__ = ["try_skymods"]
@@ -19,7 +21,10 @@ _log = logging.getLogger(__name__)
 
 SKYMODS_SEARCH = "https://catalogue.smods.ru/"
 RIMWORLD_APP_ID = "294100"
-_USER_AGENT = "rwmod/1.0"
+_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    " (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
 
 
 def try_skymods(mod_id: str, config: Config) -> Path | None:
@@ -70,36 +75,70 @@ def _extract_download_url(html: str, mod_id: str) -> str | None:
 
 
 def _download_and_extract(url: str, mod_id: str, config: Config) -> Path | None:
-    """Download a zip from Skymods and extract to mods directory."""
+    """Download from Skymods and extract to mods directory.
+    Handles redirects, gzip compression, and non-zip responses gracefully."""
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPRedirectHandler(),
+        urllib.request.HTTPCookieProcessor(),
+    )
+
     try:
         req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with opener.open(req, timeout=60) as resp:
+            content_type = resp.headers.get("Content-Type", "")
             data = resp.read()
     except OSError as e:
         _log.warning("Skymods 下载失败 (%s): %s", mod_id, e)
         return None
 
-    if len(data) < 1024:
+    if len(data) < 512:
+        _log.warning("Skymods 响应内容过短 (%s): %s bytes", mod_id, len(data))
         return None
 
-    # Save to temp file and extract
-    with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
-        tmp.write(data)
-        tmp_path = Path(tmp.name)
+    # Detect HTML responses — likely a redirect page or error
+    sniff = data[:512]
+    if sniff.startswith(b"<!") or sniff.startswith(b"<html") or sniff.startswith(b"<HTML"):
+        # Try to extract a download URL from the HTML redirect page
+        text = data.decode("utf-8", errors="replace")
+        redirect_url = _extract_download_url(text, mod_id)
+        if redirect_url and redirect_url != url:
+            _log.info("Skymods 重定向: %s → %s", url[:80], redirect_url[:80])
+            return _download_and_extract(redirect_url, mod_id, config)
+        _log.warning("Skymods 返回 HTML 而非 zip (%s): %s", mod_id, text[:200])
+        return None
 
+    # Try gzip decompression first (some CDNs apply gzip to zip files)
+    if sniff[:2] == b"\x1f\x8b":
+        with suppress(OSError):
+            data = gzip.decompress(data)
+
+    # Save to temp file
+    tmp_path: Path | None = None
     try:
-        # Extract to temp directory first
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+            tmp.write(data)
+            tmp_path = Path(tmp.name)
+
+        if not zipfile.is_zipfile(tmp_path):
+            _log.warning(
+                "Skymods 下载内容不是 zip (%s): 首字节 %s, 大小 %s",
+                mod_id,
+                sniff[:16].hex(),
+                len(data),
+            )
+            tmp_path.unlink()
+            return None
+
+        # Extract to temp directory
         extract_dir = Path(tempfile.mkdtemp())
         with zipfile.ZipFile(tmp_path, "r") as zf:
             zf.extractall(extract_dir)
 
-        # Find the mod folder (usually the first subdirectory or the root with About.xml)
         mod_folder = _find_mod_folder(extract_dir)
         if not mod_folder:
             _log.warning("Skymods zip 中未找到 Mod 文件夹: %s", mod_id)
             return None
 
-        # Copy to mods directory
         from rwmod.downloader import _pick_folder_name
 
         folder_name = _pick_folder_name(mod_folder, mod_id)
@@ -113,8 +152,10 @@ def _download_and_extract(url: str, mod_id: str, config: Config) -> Path | None:
         _log.warning("Skymods 解压失败 (%s): %s", mod_id, e)
         return None
     finally:
-        tmp_path.unlink(missing_ok=True)
-        shutil.rmtree(extract_dir, ignore_errors=True)
+        if tmp_path is not None and tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        if "extract_dir" in locals() and extract_dir.exists():
+            shutil.rmtree(extract_dir, ignore_errors=True)
 
 
 def _find_mod_folder(extract_dir: Path) -> Path | None:

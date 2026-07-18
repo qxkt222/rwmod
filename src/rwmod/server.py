@@ -7,10 +7,13 @@ Dependencies (config, DB, queue) are injected via src/rwmod/deps.py.
 
 from __future__ import annotations
 
+import json
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,13 +22,14 @@ from rwmod.database import close_db, init_db
 from rwmod.deps import get_autoupdate
 from rwmod.errors import RwmodError
 from rwmod.logger import get_log, init_logging
+
+# ── routers ────────────────────────────────────────────────────────
+from rwmod.routers.auth import router as auth_router
 from rwmod.routers.auto_update import router as autoupdate_router
 from rwmod.routers.backups import router as backups_router
 from rwmod.routers.config import router as config_router
 from rwmod.routers.dashboard import router as dashboard_router
 from rwmod.routers.download import router as download_router
-
-# ── routers ────────────────────────────────────────────────────────
 from rwmod.routers.health import router as health_router
 from rwmod.routers.history import router as history_router
 from rwmod.routers.metrics import router as metrics_router
@@ -47,33 +51,59 @@ async def lifespan(app: FastAPI):
     init_db()
     au = get_autoupdate()
     await au.start_background()
+    # Seed metrics gauges
+    from rwmod.routers.metrics import set_gauge
+
+    set_gauge("steam_online", True)
     yield
     await au.stop_background()
     close_db()
 
 
-app = FastAPI(title="rwmod Web", version="0.3.0", lifespan=lifespan)
+app = FastAPI(
+    title="rwmod Web",
+    version="0.3.0",
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json",
+)
 
 # ── middleware ─────────────────────────────────────────────────────
 app.add_middleware(GZipMiddleware, minimum_size=500)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.middleware("http")
-async def log_request_timing(request: Request, call_next):
+async def request_tracing(request: Request, call_next):
+    """Add X-Request-ID + log timing + record metrics."""
     import time
 
+    req_id = request.headers.get("X-Request-ID", str(uuid.uuid4())[:8])
     start = time.perf_counter()
     response = await call_next(request)
     elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
+    response.headers["X-Request-ID"] = req_id
+
     flag = " ⚠ SLOW" if elapsed_ms > 500 else ""
     _log.info(
-        "%s %s → %s (%sms)%s",
+        "[%s] %s %s → %s (%sms)%s",
+        req_id,
         request.method,
         request.url.path,
         response.status_code,
         elapsed_ms,
         flag,
     )
+
+    from rwmod.routers.metrics import record_request
+
+    record_request(request, response.status_code, elapsed_ms)
     return response
 
 
@@ -83,7 +113,9 @@ async def log_request_timing(request: Request, call_next):
 @app.exception_handler(RwmodError)
 async def rwmod_error_handler(request: Request, exc: RwmodError):
     """Map all RwmodError subclasses to structured JSON responses."""
-    _log.warning("%s %s → %s: %s", request.method, request.url.path, exc.status_code, exc.detail)
+    _log.warning(
+        "%s %s → %s: %s", request.method, request.url.path, exc.status_code, exc.detail
+    )
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": type(exc).__name__, "detail": exc.detail},
@@ -93,7 +125,9 @@ async def rwmod_error_handler(request: Request, exc: RwmodError):
 @app.exception_handler(Exception)
 async def catchall_handler(request: Request, exc: Exception):
     """Catch unhandled exceptions — log full traceback, return 500."""
-    _log.error("未处理异常: %s %s — %s", request.method, request.url.path, exc, exc_info=True)
+    _log.error(
+        "未处理异常: %s %s — %s", request.method, request.url.path, exc, exc_info=True
+    )
     return JSONResponse(
         status_code=500,
         content={"error": "InternalError", "detail": "内部服务器错误"},
@@ -101,6 +135,8 @@ async def catchall_handler(request: Request, exc: Exception):
 
 
 # ── routers ────────────────────────────────────────────────────────
+# Order: auth first (login doesn't need auth), then functional routes
+app.include_router(auth_router)
 app.include_router(health_router)
 app.include_router(config_router)
 app.include_router(dashboard_router)
@@ -120,6 +156,45 @@ app.include_router(metrics_router)
 @app.get("/")
 def index():
     return FileResponse(STATIC_DIR / "index.html")
+
+
+# ── WebSocket ─────────────────────────────────────────────────────
+@app.websocket("/ws")
+async def ws_endpoint(ws: WebSocket):
+    """WebSocket for real-time status updates to frontend."""
+    await ws.accept()
+    try:
+        while True:
+            data = await ws.receive_text()
+            try:
+                msg = json.loads(data)
+            except json.JSONDecodeError:
+                await ws.send_json({"type": "error", "msg": "invalid json"})
+                continue
+
+            cmd = msg.get("cmd", "ping")
+            if cmd == "ping":
+                from rwmod.routers.metrics import set_gauge
+
+                pending = _queue_pending_count()
+                set_gauge("queue_depth", pending)
+                await ws.send_json({"type": "pong", "queue_pending": pending})
+            elif cmd == "subscribe":
+                await ws.send_json({"type": "subscribed", "topic": msg.get("topic", "all")})
+            else:
+                await ws.send_json({"type": "echo", "cmd": cmd})
+    except WebSocketDisconnect:
+        pass
+
+
+def _queue_pending_count() -> int:
+    try:
+        from rwmod.queue import get_queue
+
+        items = get_queue().snapshot()
+        return sum(1 for i in items if i["status"] in ("pending", "downloading"))
+    except Exception:
+        return 0
 
 
 if STATIC_DIR.exists():

@@ -87,6 +87,19 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_dl_workshop ON download_history(workshop_id);
         CREATE INDEX IF NOT EXISTS idx_dl_created   ON download_history(created_at);
         CREATE INDEX IF NOT EXISTS idx_lmm_workshop ON local_mod_metadata(workshop_id);
+
+        CREATE TABLE IF NOT EXISTS download_queue (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            workshop_id TEXT    NOT NULL UNIQUE,
+            name        TEXT    DEFAULT '',
+            status      TEXT    NOT NULL DEFAULT 'pending',
+            progress    REAL    DEFAULT 0.0,
+            msg         TEXT    DEFAULT '',
+            created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+            updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_dq_status ON download_queue(status);
     """)
     db.commit()
 
@@ -159,4 +172,60 @@ def get_download_stats() -> dict:
 def clear_history() -> None:
     db = _get_conn()
     db.execute("DELETE FROM download_history")
+    db.commit()
+
+
+# ── queue persistence ──────────────────────────────────────────────
+
+
+def queue_upsert(workshop_id: str, **kwargs) -> None:
+    """Insert or update a queue item. kwargs: name, status, progress, msg."""
+    db = _get_conn()
+    name = kwargs.get("name", "")
+    status = kwargs.get("status", "pending")
+    progress = kwargs.get("progress", 0.0)
+    msg = kwargs.get("msg", "")
+
+    sets = [f"{k} = ?" for k in kwargs]
+    # Parameter list: INSERT values first, then SET values
+    params: list = [workshop_id, name, status, progress, msg]
+    params.extend(kwargs[k] for k in kwargs)
+
+    sets.append("updated_at = datetime('now')")
+    db.execute(
+        f"INSERT INTO download_queue (workshop_id, name, status, progress, msg)"
+        f" VALUES (?,?,?,?,?)"
+        f" ON CONFLICT(workshop_id) DO UPDATE SET {', '.join(sets)}",
+        params,
+    )
+    db.commit()
+
+
+def queue_delete(workshop_id: str) -> None:
+    db = _get_conn()
+    db.execute("DELETE FROM download_queue WHERE workshop_id = ?", (workshop_id,))
+    db.commit()
+
+
+def queue_load_pending() -> list[dict]:
+    """Load pending/downloading items from DB (for restart recovery)."""
+    db = _get_conn()
+    rows = db.execute(
+        "SELECT * FROM download_queue WHERE status IN ('pending','downloading')"
+        " ORDER BY created_at ASC"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def queue_load_all() -> list[dict]:
+    """Load all queue items from DB."""
+    db = _get_conn()
+    rows = db.execute("SELECT * FROM download_queue ORDER BY created_at ASC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def queue_clear_done() -> None:
+    """Remove completed/cancelled items from queue table."""
+    db = _get_conn()
+    db.execute("DELETE FROM download_queue WHERE status IN ('done','cancelled')")
     db.commit()

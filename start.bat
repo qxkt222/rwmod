@@ -13,10 +13,14 @@ if not exist ".venv\Scripts\python.exe" (
 )
 
 echo [1/2] Building frontend...
-cd frontend
+set NPX_CMD=npx.cmd
+if exist "D:\DevTools\links\npx.cmd" set NPX_CMD=D:\DevTools\links\npx.cmd
+if not exist "%NPX_CMD%" (
+    where /R "%APPDATA%\npm" npx.cmd >nul 2>&1 && set "NPX_CMD=npx.cmd"
+)
 
-where npx >nul 2>&1
-if errorlevel 1 (
+cd frontend
+if not exist "%NPX_CMD%" (
     echo     npx not found, skipping frontend build.
     echo     If frontend looks outdated, run in terminal:
     echo       cd frontend ^&^& npx vite build --outDir ../static --emptyOutDir
@@ -25,7 +29,7 @@ if errorlevel 1 (
 )
 
 echo     Building...
-call npx vite build --outDir ../static --emptyOutDir
+call "%NPX_CMD%" vite build --outDir ../static --emptyOutDir
 if errorlevel 1 (
     echo [!] Build failed, using existing static files.
     cd ..

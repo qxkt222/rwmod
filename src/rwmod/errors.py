@@ -8,10 +8,20 @@ from __future__ import annotations
 
 
 class RwmodError(Exception):
-    """Base exception for all rwmod errors."""
+    """Base exception for all rwmod errors.
+
+    Usage:
+        raise ConfigError("steamcmd.exe 未找到")
+        raise ModNotFoundError(f"Mod {mod_id} 不存在")
+    """
 
     status_code: int = 500
     detail: str = "内部错误"
+
+    def __init__(self, detail: str | None = None) -> None:
+        if detail is not None:
+            self.detail = detail
+        super().__init__(self.detail)
 
 
 class ConfigError(RwmodError):

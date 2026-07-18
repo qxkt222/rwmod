@@ -85,7 +85,7 @@ def safe_fetch(fetch_fn, *args, **kwargs):
         _log.debug("API 调用失败（离线模式）: %s", e)
         mark_offline()
         # Return appropriate empty value based on expected return type
-        return {} if isinstance(result := _get_default(fetch_fn), dict) else result
+        return _get_default(fetch_fn)
 
 
 def _get_default(fn) -> dict | list:

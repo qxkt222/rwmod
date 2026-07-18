@@ -2,6 +2,8 @@
 
 import asyncio
 import os
+import time
+from typing import Any
 
 from fastapi import APIRouter, Depends
 
@@ -13,12 +15,17 @@ from rwmod.steamcmd import SteamCMD
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
+# ── lightweight in-memory cache for dashboard stats ───────────────
+_cache: dict[str, Any] = {}
+_CACHE_TTL = 5  # seconds
 
-@router.get("/dashboard")
-async def dashboard(
-    cfg: Config = Depends(get_config), au: AutoUpdateManager = Depends(get_autoupdate)
-):
-    """Dashboard stats: mod count, update status, disk usage, recent activity."""
+
+def _cached_dashboard(cfg: Config) -> dict:
+    """Return cached dashboard stats if fresh, otherwise recompute."""
+    now = time.time()
+    if _cache and now - _cache.get("_ts", 0) < _CACHE_TTL:
+        return _cache
+
     mods_count = 0
     total_size = 0
     if cfg.mods_dir.exists():
@@ -33,14 +40,24 @@ async def dashboard(
                 except OSError:
                     pass
 
+    _cache["mods_count"] = mods_count
+    _cache["disk_usage_mb"] = round(total_size / 1024 / 1024, 1)
+    _cache["_ts"] = now
+    return _cache
+
+
+@router.get("/dashboard")
+async def dashboard(
+    cfg: Config = Depends(get_config), au: AutoUpdateManager = Depends(get_autoupdate)
+):
+    """Dashboard stats: mod count, update status, disk usage, recent activity."""
+    cached = _cached_dashboard(cfg)
     asyncio.create_task(au.run_check())
-
     history = get_download_history(limit=10)
-
     return {
-        "mods_count": mods_count,
+        "mods_count": cached["mods_count"],
         "updates_pending": len(au.last_result),
-        "disk_usage_mb": round(total_size / 1024 / 1024, 1),
+        "disk_usage_mb": cached["disk_usage_mb"],
         "recent_activity": history,
     }
 

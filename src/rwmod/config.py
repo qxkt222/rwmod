@@ -5,11 +5,9 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+from rwmod.errors import ConfigError
+
 __all__ = ["Config"]
-
-
-class ConfigError(Exception):
-    """Raised when configuration validation fails."""
 
 
 class Config:

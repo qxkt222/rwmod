@@ -193,11 +193,12 @@ def _find_backups(backup_dir: Path, workshop_id: str) -> list[dict]:
     return results
 
 
-def _backup_metadata(zip_path: Path) -> dict:
+def _backup_metadata(zip_path: Path) -> dict[str, str]:
     """Extract metadata from backup filename."""
     parts = zip_path.stem.split(_SEP, 2)
     if len(parts) < 3:
         return {}
+    return {"workshop_id": parts[0], "folder_name": parts[1], "timestamp": parts[2]}
     return {"workshop_id": parts[0], "folder_name": parts[1], "timestamp": parts[2]}
 
 
