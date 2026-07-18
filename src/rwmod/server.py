@@ -113,9 +113,7 @@ async def request_tracing(request: Request, call_next):
 @app.exception_handler(RwmodError)
 async def rwmod_error_handler(request: Request, exc: RwmodError):
     """Map all RwmodError subclasses to structured JSON responses."""
-    _log.warning(
-        "%s %s → %s: %s", request.method, request.url.path, exc.status_code, exc.detail
-    )
+    _log.warning("%s %s → %s: %s", request.method, request.url.path, exc.status_code, exc.detail)
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": type(exc).__name__, "detail": exc.detail},
@@ -125,9 +123,7 @@ async def rwmod_error_handler(request: Request, exc: RwmodError):
 @app.exception_handler(Exception)
 async def catchall_handler(request: Request, exc: Exception):
     """Catch unhandled exceptions — log full traceback, return 500."""
-    _log.error(
-        "未处理异常: %s %s — %s", request.method, request.url.path, exc, exc_info=True
-    )
+    _log.error("未处理异常: %s %s — %s", request.method, request.url.path, exc, exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"error": "InternalError", "detail": "内部服务器错误"},

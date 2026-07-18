@@ -8,7 +8,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "esbuild": "^0.25",
+    "esbuild": "^0.27",
     "typescript": "^5.7",
     "vite": "^8.0"
   }

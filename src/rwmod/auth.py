@@ -74,9 +74,7 @@ def verify_token(token: str) -> str | None:
         # Verify signature
         signing_input = f"{header_b64}.{payload_b64}".encode()
         expected_sig = (
-            urlsafe_b64encode(_hmac_sign(signing_input, get_secret()))
-            .rstrip(b"=")
-            .decode()
+            urlsafe_b64encode(_hmac_sign(signing_input, get_secret())).rstrip(b"=").decode()
         )
 
         if not hmac.compare_digest(sig_b64, expected_sig):
