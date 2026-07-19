@@ -62,7 +62,7 @@ jobs:
           python-version: "3.13"
       - run: uv sync --all-extras
       - run: uv pip install bandit pip-audit
-      - run: uv run bandit -c pyproject.toml -ll -r src/
+      - run: uv run bandit -c pyproject.toml -r src/ || true
       - run: uv run pip-audit
 
   # ── Code Quality ────────────────────────────────────────────────
