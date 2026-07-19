@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: "3.13"
       - run: uv sync --all-extras
-      - run: uv pip install mypy
+      - run: uv pip install mypy pydantic fastapi
       - run: uv run mypy src/rwmod/
 
   # ── Tests + Coverage ────────────────────────────────────────────
@@ -45,6 +45,7 @@ jobs:
         with:
           python-version: "3.13"
       - run: uv sync --all-extras
+      - run: uv pip install pytest pytest-cov httpx
       - run: uv run pytest -m "not network" --cov=rwmod --cov-report=xml --cov-report=term-missing
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
