@@ -7,6 +7,7 @@
  *   store.set("count", 5);  // triggers subscriber
  */
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Listener<T> = (val: T) => void;
 
 class Store<T extends Record<string, unknown>> {
@@ -36,8 +37,8 @@ class Store<T extends Record<string, unknown>> {
 
   subscribe<K extends keyof T>(key: K, fn: Listener<T[K]>): () => void {
     if (!this._listeners.has(key)) this._listeners.set(key, new Set());
-    this._listeners.get(key)!.add(fn);
-    return () => this._listeners.get(key)?.delete(fn);
+    this._listeners.get(key)!.add(fn as Listener<unknown>);
+    return () => this._listeners.get(key)?.delete(fn as Listener<unknown>);
   }
 
   snapshot(): Readonly<T> {
@@ -79,7 +80,8 @@ export interface ConfigData {
 }
 
 /** Global application store */
-export const store = new Store<AppState>({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const store = new Store<AppState & Record<string, any>>({
   mods: [],
   queue: [],
   config: null,

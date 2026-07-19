@@ -39,7 +39,7 @@ export function initRouter(onPanelChange: PanelChangeHandler): () => void {
   // ── listen for browser back/forward ──────────────────────────
   const popHandler = () => {
     const panel = readPanelFromHash();
-    onPanelChange(panel);
+    onPanelChange(panel || "dashboard");
   };
 
   window.addEventListener("popstate", popHandler);

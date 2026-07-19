@@ -17,6 +17,16 @@ const HEALTH_LABELS: Record<string, string> = {
   unknown: "⚪ 未知",
 };
 
+function esc(s: string): string {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function escAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export function initModsPanel(mods: ModEntry[], onClick: (mod: ModEntry) => void) {
   _onClick = onClick;
   loadHealth();
@@ -47,7 +57,7 @@ async function loadHealth() {
       const folder = row.querySelector(".mod-meta span:first-child")?.textContent;
       const status = healthMap[folder || ""];
       if (status) {
-        let badge = row.querySelector(".health-badge");
+        let badge = row.querySelector(".health-badge") as HTMLElement | null;
         if (!badge) {
           badge = document.createElement("span");
           badge.className = "health-badge";
@@ -90,7 +100,7 @@ async function loadCompatibility() {
     // Apply badges to mod rows
     document.querySelectorAll("#mod-list .mod-row").forEach((row) => {
       const folder = row.querySelector(".mod-meta span:first-child")?.textContent || "";
-      let badge = row.querySelector(".compat-badge");
+      let badge = row.querySelector(".compat-badge") as HTMLElement | null;
       if (!badge) {
         badge = document.createElement("span");
         badge.className = "compat-badge";
@@ -98,10 +108,10 @@ async function loadCompatibility() {
         row.querySelector(".mod-info")?.appendChild(badge);
       }
       if (incompat.has(folder)) {
-        (badge as HTMLElement).textContent = "❌ 不兼容";
+        badge.textContent = "❌ 不兼容";
         badge.style.cssText += ";color:#f7768e;background:#3b1e2c";
       } else if (unknownSet.has(folder)) {
-        (badge as HTMLElement).textContent = "❓ 未知";
+        badge.textContent = "❓ 未知";
         badge.style.cssText += ";color:var(--gray-text)";
       } else {
         badge.remove();

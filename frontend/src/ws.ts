@@ -2,7 +2,7 @@
  * WebSocket client for real-time download progress.
  * Falls back to SSE via api.downloadStream if WS unavailable.
  */
-interface WSMessage {
+export interface WSMessage {
   type: string;
   mod_id?: string;
   msg?: string;
@@ -10,6 +10,7 @@ interface WSMessage {
   total?: number;
   ok?: number;
   fail?: number;
+  items?: { id: string; name: string; status: string; progress: number; msg: string }[];
 }
 
 type WSCallback = (msg: WSMessage) => void;
