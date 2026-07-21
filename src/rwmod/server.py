@@ -8,6 +8,7 @@ Dependencies (config, DB, queue) are injected via src/rwmod/deps.py.
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -22,6 +23,7 @@ from rwmod.database import close_db, init_db
 from rwmod.deps import get_autoupdate
 from rwmod.errors import RwmodError
 from rwmod.logger import get_log, init_logging
+from rwmod.queue import get_queue
 
 # ── routers ────────────────────────────────────────────────────────
 from rwmod.routers.auth import router as auth_router
@@ -32,11 +34,14 @@ from rwmod.routers.dashboard import router as dashboard_router
 from rwmod.routers.download import router as download_router
 from rwmod.routers.health import router as health_router
 from rwmod.routers.history import router as history_router
+from rwmod.routers.metrics import record_request, set_gauge
 from rwmod.routers.metrics import router as metrics_router
 from rwmod.routers.mods import router as mods_router
 from rwmod.routers.profiles import router as profiles_router
 from rwmod.routers.queue import router as queue_router
 from rwmod.routers.rimsort import router as rimsort_router
+from rwmod.routers.saves import router as saves_router
+from rwmod.routers.tags import router as tags_router
 from rwmod.routers.workshop import router as workshop_router
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
@@ -51,10 +56,10 @@ async def lifespan(app: FastAPI):
     init_db()
     au = get_autoupdate()
     await au.start_background()
-    # Seed metrics gauges
-    from rwmod.routers.metrics import set_gauge
-
     set_gauge("steam_online", True)
+    # Seed app state (future: migrate singletons here)
+    from rwmod.app_state import AppState
+    app.state.rwmod = AppState()
     yield
     await au.stop_background()
     close_db()
@@ -82,8 +87,6 @@ app.add_middleware(
 @app.middleware("http")
 async def request_tracing(request: Request, call_next):
     """Add X-Request-ID + log timing + record metrics."""
-    import time
-
     req_id = request.headers.get("X-Request-ID", str(uuid.uuid4())[:8])
     start = time.perf_counter()
     response = await call_next(request)
@@ -100,8 +103,6 @@ async def request_tracing(request: Request, call_next):
         elapsed_ms,
         flag,
     )
-
-    from rwmod.routers.metrics import record_request
 
     record_request(request, response.status_code, elapsed_ms)
     return response
@@ -146,6 +147,8 @@ app.include_router(rimsort_router)
 app.include_router(history_router)
 app.include_router(autoupdate_router)
 app.include_router(metrics_router)
+app.include_router(tags_router)
+app.include_router(saves_router)
 
 
 # ── static files ───────────────────────────────────────────────────
@@ -170,8 +173,6 @@ async def ws_endpoint(ws: WebSocket):
 
             cmd = msg.get("cmd", "ping")
             if cmd == "ping":
-                from rwmod.routers.metrics import set_gauge
-
                 pending = _queue_pending_count()
                 set_gauge("queue_depth", pending)
                 await ws.send_json({"type": "pong", "queue_pending": pending})
@@ -185,8 +186,6 @@ async def ws_endpoint(ws: WebSocket):
 
 def _queue_pending_count() -> int:
     try:
-        from rwmod.queue import get_queue
-
         items = get_queue().snapshot()
         return sum(1 for i in items if i["status"] in ("pending", "downloading"))
     except Exception:

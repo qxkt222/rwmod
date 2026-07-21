@@ -6,8 +6,8 @@
 # ── Stage 1: Frontend build (Node) ──────────────────────────
 FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci
+COPY frontend/package.json frontend/bun.lock* ./
+RUN npm install
 COPY frontend/ ./
 RUN npx vite build --outDir /app/static
 

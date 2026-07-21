@@ -69,8 +69,8 @@ def steamcmd_check(cfg: Config = Depends(get_config)):
         return {"ok": False, "msg": "SteamCMD 路径不存在"}
     try:
         steamcmd = SteamCMD(cfg.steamcmd_path)
-        rc, lines = steamcmd.workshop_download("0")
-        for line in lines:
+        result = steamcmd.workshop_download("0")
+        for line in result.output_lines:
             if "FAILED" in line and "login" in line.lower():
                 return {"ok": False, "msg": "SteamCMD 登录失败"}
         return {"ok": True, "msg": "SteamCMD 就绪"}

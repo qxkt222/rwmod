@@ -88,6 +88,12 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_dl_created   ON download_history(created_at);
         CREATE INDEX IF NOT EXISTS idx_lmm_workshop ON local_mod_metadata(workshop_id);
 
+        CREATE TABLE IF NOT EXISTS mod_tags (
+            folder TEXT NOT NULL,
+            tag    TEXT NOT NULL,
+            PRIMARY KEY (folder, tag)
+        );
+
         CREATE TABLE IF NOT EXISTS download_queue (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             workshop_id TEXT    NOT NULL UNIQUE,

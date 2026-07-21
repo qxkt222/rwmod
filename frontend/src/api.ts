@@ -15,6 +15,7 @@ export interface ConfigData {
   mods_dir: string;
   rimworld_dir: string;
   backup_dir: string;
+  steam_api_key: string;
   steamcmd_exists: boolean;
   mods_dir_exists: boolean;
 }

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import shutil
 import time
 import xml.etree.ElementTree as ET
@@ -11,6 +10,17 @@ from pathlib import Path
 
 from rwmod.config import Config
 from rwmod.steamcmd import DownloadResult, ErrorKind, SteamCMD
+from rwmod.utils import extract_mod_id, safe_filename
+
+
+def _try_broadcast() -> None:
+    """Notify WebSocket clients of queue changes, if server is running."""
+    try:
+        from rwmod.server import broadcast_queue_update
+        import asyncio
+        asyncio.create_task(broadcast_queue_update())
+    except Exception:
+        pass
 
 __all__ = ["download_one", "extract_mod_id", "_find_existing", "_pick_folder_name"]
 
@@ -18,16 +28,6 @@ _log = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
 RETRY_DELAY = 5
-
-
-def extract_mod_id(raw: str) -> str | None:
-    """Parse a mod ID from raw input: plain digits or workshop URL."""
-    m = re.search(r"[?&]id=(\d+)", raw)
-    if m:
-        return m.group(1)
-    if raw.strip().isdigit():
-        return raw.strip()
-    return None
 
 
 def _find_existing(mods_dir: Path, mod_id: str) -> Path | None:
@@ -53,10 +53,10 @@ def _read_about_field(mod_dir: Path, tag: str) -> str:
 def _pick_folder_name(workshop_path: Path, mod_id: str) -> str:
     pkg = _read_about_field(workshop_path, "packageId")
     if pkg:
-        return re.sub(r'[<>:"/\\|?*]', "_", pkg)
+        return safe_filename(pkg, allow_empty=False)
     name = _read_about_field(workshop_path, "name")
     if name:
-        return f"{re.sub(r'[<>:"/\\|?*]', '_', name)}_{mod_id}"
+        return f"{safe_filename(name, allow_empty=False)}_{mod_id}"
     return f"mod_{mod_id}"
 
 
@@ -65,6 +65,10 @@ def download_one(config: Config, mod_id: str, force: bool = False) -> bool:
 
     Smart retry: only retries for transient errors (network issues).
     For permanent errors (removed, private, wrong game), skips to Skymods.
+
+    Collection handling: detects collections via Steam Web API BEFORE
+    attempting SteamCMD (which cannot download collections). For collections,
+    fetches all child mod IDs and recursively downloads each one.
     """
     steamcmd = SteamCMD(config.steamcmd_path)
 
@@ -82,6 +86,35 @@ def download_one(config: Config, mod_id: str, force: bool = False) -> bool:
         else:
             _log.info("已安装: %s", existing.name)
             return True
+
+    # ── collection detection (Web API, no SteamCMD needed) ──────────
+    # SteamCMD cannot download collections — only individual mod files.
+    # Detect collections via Steam Web API first and handle them separately.
+    try:
+        from rwmod.workshop import fetch_collection_children, is_collection
+
+        if is_collection(mod_id):
+            _log.info("检测到合集 ID: %s，获取子项...", mod_id)
+            children = fetch_collection_children(mod_id)
+            if not children:
+                _log.warning("合集 %s 为空或无法获取子项", mod_id)
+                return False
+            _log.info("合集包含 %s 个 Mod，逐个下载...", len(children))
+            ok = 0
+            fail = 0
+            for i, cid in enumerate(children, 1):
+                _log.info("[%s/%s] 合集子项 %s", i, len(children), cid)
+                if download_one(config, cid, force=force):
+                    ok += 1
+                else:
+                    fail += 1
+                _try_broadcast()
+            _log.info("合集下载完成: %s 成功, %s 失败, %s 总计", ok, fail, len(children))
+            return ok > 0
+    except Exception as e:
+        # If collection detection fails (network issue), fall through to
+        # regular SteamCMD download — it will fail with a clear error too.
+        _log.debug("合集检测失败（将尝试常规下载）: %s", e)
 
     last_result: DownloadResult | None = None
 
@@ -123,15 +156,7 @@ def download_one(config: Config, mod_id: str, force: bool = False) -> bool:
         # Check if this is a collection
         about = workshop_dir / "About" / "About.xml"
         if not about.exists():
-            from rwmod.parser import parse_collection_dir
-
-            collection_ids = parse_collection_dir(workshop_dir)
-            if collection_ids:
-                _log.info("检测到合集，包含 %s 个 Mod，逐个下载...", len(collection_ids))
-                ok = sum(1 for cid in collection_ids if download_one(config, cid, force=force))
-                _log.info("合集下载完成: %s/%s", ok, len(collection_ids))
-                return ok > 0
-            _log.warning("下载的目录不是有效 Mod 也不是合集: %s", mod_id)
+            _log.warning("Downloaded content is not a valid mod (no About.xml): %s", mod_id)
             return _skymods_fallback(config, mod_id)
 
         folder_name = _pick_folder_name(workshop_dir, mod_id)

@@ -89,6 +89,16 @@ async function _lazyInit(panel: string): Promise<void> {
       initConfigPanel();
       break;
     }
+    case "saves": {
+      const { initSavesPanel } = await import("./panels/saves");
+      initSavesPanel();
+      break;
+    }
+    case "tags": {
+      const { initTagsPanel } = await import("./panels/tags");
+      initTagsPanel();
+      break;
+    }
   }
 }
 
@@ -108,6 +118,8 @@ document.getElementById("app")!.innerHTML = /* html */ `
     <button class="tab" data-panel="profiles">💾 配置档案</button>
     <button class="tab" data-panel="history">📜 历史</button>
     <button class="tab" data-panel="backups">💾 备份</button>
+    <button class="tab" data-panel="saves">Saves</button>
+    <button class="tab" data-panel="tags">Tags</button>
     <button class="tab" data-panel="config">⚙ 配置</button>
   </div>
   <div class="spacer"></div>
@@ -135,6 +147,8 @@ document.getElementById("app")!.innerHTML = /* html */ `
     <div class="side-item" data-panel="profiles"><span class="ico">💾</span>配置档案</div>
     <div class="side-item" data-panel="history"><span class="ico">📜</span>下载历史</div>
     <div class="side-item" data-panel="backups"><span class="ico">💾</span>备份管理</div>
+    <div class="side-item" data-panel="saves"><span class="ico">Saves</span></div>
+    <div class="side-item" data-panel="tags"><span class="ico">Tags</span></div>
     <div class="side-item" data-panel="config"><span class="ico">⚙</span>配置</div>
   </aside>
 

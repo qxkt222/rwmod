@@ -15,6 +15,8 @@ import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 
+from rwmod.utils import safe_filename
+
 _log = logging.getLogger(__name__)
 
 _SEP = "__"  # separator between workshop_id, folder_name, timestamp
@@ -44,7 +46,7 @@ def backup_mod(
     backup_dir.mkdir(parents=True, exist_ok=True)
 
     ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-    safe_name = _safe_filename(folder_name)
+    safe_name = safe_filename(folder_name)
     zip_path = backup_dir / f"{workshop_id}{_SEP}{safe_name}{_SEP}{ts}.zip"
 
     _log.info("备份: %s → %s", folder_name, zip_path.name)
@@ -173,9 +175,9 @@ def cleanup_backups(backup_dir: Path, keep_per_mod: int = 5) -> int:
 
 def _safe_filename(name: str) -> str:
     """Replace filesystem-unfriendly characters."""
-    import re
+    from rwmod.utils import safe_filename
 
-    return re.sub(r'[<>:"/\\|?*]', "_", name)
+    return safe_filename(name, allow_empty=False)
 
 
 def _find_backups(backup_dir: Path, workshop_id: str) -> list[dict]:
@@ -198,7 +200,6 @@ def _backup_metadata(zip_path: Path) -> dict[str, str]:
     parts = zip_path.stem.split(_SEP, 2)
     if len(parts) < 3:
         return {}
-    return {"workshop_id": parts[0], "folder_name": parts[1], "timestamp": parts[2]}
     return {"workshop_id": parts[0], "folder_name": parts[1], "timestamp": parts[2]}
 
 

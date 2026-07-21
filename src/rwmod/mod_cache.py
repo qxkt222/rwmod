@@ -47,9 +47,10 @@ def get_cached_mods(mods_dir: Path) -> list[ModMeta]:
         if _cache and (now - _cache_time) < _MAX_AGE_SECONDS and dir_mtime == _cache_dir_mtime:
             return list(_cache.values())
 
-    # Layer 2: persistent SQLite cache with per-mod incremental refresh
+    # Layer 2: persistent SQLite cache with per-mod incremental refresh.
     # get_or_refresh_metas handles cold start internally — if DB is empty,
     # it does a full scan and writes results back to SQLite.
+    # Layer 3 (below) is a fallback only if the DB layer is completely broken.
     try:
         from rwmod.cache_db import get_or_refresh_metas
 
@@ -66,8 +67,9 @@ def get_cached_mods(mods_dir: Path) -> list[ModMeta]:
             _cache_dir_mtime = dir_mtime
         return metas
 
-    # Layer 3: full filesystem scan (only if DB is broken or cache_db import fails)
-    # os.scandir() caches stat info in DirEntry, avoiding extra syscalls per entry
+    # Layer 3: full filesystem scan (emergency fallback — only if SQLite cache is
+    # completely broken/unavailable). Normal operation never reaches this path
+    # because get_or_refresh_metas does a full scan when DB is empty.
     new_cache: dict[str, ModMeta] = {}
     with os.scandir(mods_dir) as entries:
         for entry in sorted(entries, key=lambda e: e.name):

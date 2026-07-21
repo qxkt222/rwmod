@@ -157,18 +157,56 @@ def _check_core_dlc(order: list[str], issues: list[dict]) -> None:
 
 
 def _check_known_conflicts(order: list[str], mods_dir: Path, issues: list[dict]) -> None:
-    """Check for known incompatible mod pairs."""
+    """Check for known incompatible mod pairs.
+
+    Uses the RimPy community database if available; falls back to
+    a small set of hardcoded rules when offline.
+    """
     pid_lower = [p.lower() for p in order]
+
+    # Try RimPy database first
+    try:
+        from rwmod.rimpy_db import RimPyDB
+
+        db = RimPyDB.get()
+        # Collect workshop IDs from installed mods
+        import xml.etree.ElementTree as ET
+
+        pkg_to_wid: dict[str, str] = {}
+        for d in mods_dir.iterdir():
+            pf = d / "About" / "PublishedFileId.txt"
+            about = d / "About" / "About.xml"
+            if pf.exists() and about.exists():
+                try:
+                    pid = ET.parse(about).getroot().findtext("packageId", "")
+                    wid = pf.read_text(encoding="utf-8").strip()
+                    if pid and wid:
+                        pkg_to_wid[pid.lower()] = wid
+                except Exception:
+                    pass
+
+        active_wids = {pkg_to_wid[p] for p in pid_lower if p in pkg_to_wid}
+        if active_wids and db.ensure_loaded():
+            db_conflicts = db.get_conflicts(active_wids)
+            for c in db_conflicts:
+                issues.append({
+                    "severity": "error",
+                    "message": f"⚠ {c['reason']}",
+                })
+            if db_conflicts:
+                return  # Use DB results, skip hardcoded fallback
+    except Exception:
+        pass
+
+    # Fallback: hardcoded known conflicts (offline / DB unavailable)
     for a_keyword, b_keyword, reason in _KNOWN_CONFLICTS:
         a_found = [i for i, p in enumerate(pid_lower) if a_keyword in p]
         b_found = [i for i, p in enumerate(pid_lower) if b_keyword in p]
         if a_found and b_found:
-            issues.append(
-                {
-                    "severity": "error",
-                    "message": f"⚠ {reason}",
-                }
-            )
+            issues.append({
+                "severity": "error",
+                "message": f"⚠ {reason}",
+            })
 
 
 def _check_duplicates(order: list[str], issues: list[dict]) -> None:

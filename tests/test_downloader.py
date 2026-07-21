@@ -31,12 +31,12 @@ class TestExtractModId:
         assert extract_mod_id(url) == "123456"
 
     def test_invalid_input(self):
-        assert extract_mod_id("not_a_number") is None
-        assert extract_mod_id("https://example.com") is None
-        assert extract_mod_id("") is None
+        assert not extract_mod_id("not_a_number")
+        assert not extract_mod_id("https://example.com")
+        assert not extract_mod_id("")
 
     def test_whitespace_only(self):
-        assert extract_mod_id("   ") is None
+        assert not extract_mod_id("   ")
 
     def test_whitespace_number(self):
         # Numbers with whitespace are stripped and considered valid

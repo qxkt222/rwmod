@@ -11,6 +11,8 @@ import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from pathlib import Path
 
+from rwmod.utils import safe_filename
+
 __all__ = [
     "PROFILES_DIR",
     "list_profiles",
@@ -89,7 +91,7 @@ def save_profile(name: str, source_path: Path | str, label: str = "") -> dict:
     """
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
 
-    safe_name = _safe_filename(name)
+    safe_name = safe_filename(name)
     dest = PROFILES_DIR / f"{safe_name}.xml"
 
     source = (
@@ -132,7 +134,7 @@ def restore_profile(name: str, target_path: Path) -> dict:
     Returns:
         {"ok": bool, "msg": str}
     """
-    safe_name = _safe_filename(name)
+    safe_name = safe_filename(name)
     src = PROFILES_DIR / f"{safe_name}.xml"
 
     if not src.exists():
@@ -161,7 +163,7 @@ def restore_profile(name: str, target_path: Path) -> dict:
 
 def delete_profile(name: str) -> bool:
     """Delete a saved profile."""
-    safe_name = _safe_filename(name)
+    safe_name = safe_filename(name)
     path = PROFILES_DIR / f"{safe_name}.xml"
     if not path.exists():
         return False
@@ -187,7 +189,6 @@ def _count_mods_in_xml(path: Path) -> int:
 
 def _safe_filename(name: str) -> str:
     """Sanitize a profile name for use as a filename."""
-    import re
+    from rwmod.utils import safe_filename
 
-    # Replace any character unsafe for filenames
-    return re.sub(r'[\\/:*?"<>|]', "_", name.strip()).strip("._") or "unnamed"
+    return safe_filename(name, allow_empty=False)

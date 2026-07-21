@@ -1,3 +1,46 @@
+[project]
+name = "rwmod"
+version = "0.3.0"
+description = "RimWorld Mod Manager — offline mod downloader & manager powered by SteamCMD"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.13"
+authors = [
+    {name = "qxkt222"},
+]
+keywords = ["rimworld", "mod", "steam", "steamcmd", "workshop"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Games/Entertainment",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.30",
+    "typer>=0.25",
+    "pydantic>=2.0",
+    "python-multipart>=0.0.9",
+    "websockets>=14",
+]
+
+[project.scripts]
+rwmod = "rwmod.cli:app"
+rwmod-web = "rwmod.server:app"
+
+[project.urls]
+Homepage = "https://github.com/qxkt222/rwmod"
+Repository = "https://github.com/qxkt222/rwmod"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [tool.ruff]
 line-length = 100
 target-version = "py313"

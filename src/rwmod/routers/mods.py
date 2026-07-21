@@ -1,5 +1,6 @@
-"""Mods router — listing, health, compatibility, export, collection-export."""
+"""Mods router — listing, health, compatibility, export, collection-export, disk usage."""
 
+import os
 import time
 from typing import Any
 
@@ -9,6 +10,7 @@ from rwmod.config import Config
 from rwmod.deps import get_config
 from rwmod.metadata import read_mod_metadata
 from rwmod.mod_cache import get_cached_mods
+from rwmod.tags import get_tags
 from rwmod.workshop import check_mod_updates, fetch_item_details
 
 router = APIRouter(prefix="/api/mods", tags=["mods"])
@@ -25,18 +27,35 @@ def _cached_mod_list(cfg: Config) -> list[dict]:
     if not cfg.mods_dir.exists():
         return []
     metas = get_cached_mods(cfg.mods_dir)
-    data = [
-        {
+    data = []
+    for m in metas:
+        mod_dir = cfg.mods_dir / m.folder
+        size_mb = _get_dir_size_mb(mod_dir)
+        tags = get_tags(m.folder)
+        data.append({
             "folder": m.folder,
             "name": m.name,
             "package_id": m.package_id,
             "workshop_id": m.workshop_id,
-        }
-        for m in metas
-    ]
+            "size_mb": size_mb,
+            "tags": tags,
+        })
     _mods_cache["data"] = data
     _mods_cache["_ts"] = now
     return data
+
+
+def _get_dir_size_mb(dir_path) -> float:
+    """Get the total file size of a directory in MB."""
+    total = 0
+    try:
+        with os.scandir(dir_path) as entries:
+            for entry in entries:
+                if entry.is_file():
+                    total += entry.stat().st_size
+    except OSError:
+        pass
+    return round(total / 1024 / 1024, 2)
 
 
 @router.get("")

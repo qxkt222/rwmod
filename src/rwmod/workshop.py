@@ -114,52 +114,120 @@ def is_collection(workshop_id: str) -> bool:
     return False
 
 
+
+
+
+
+
 def fetch_collection_children(collection_id: str) -> list[str]:
-    """Fetch all mod IDs in a Steam Workshop collection via Web API.
+    """Fetch all mod IDs in a Steam Workshop collection with 3-layer fallback.
 
-    Uses IPublishedFileService/QueryFiles/v1 with return_children=1
-    and numperpage=100 to get all child items in a single API call.
-    No SteamCMD needed — purely HTTP.
+    Layer 1: Steam Web API - fast, works for public collections
+    Layer 2: HTML scraping - fallback when API returns empty
+    Layer 3: User API Key - for private/friends-only collections
     """
-    url = (
-        f"https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?"
-        f"key=anonymous&format=json&appid={STEAM_APP_ID}"
-        f"&query_type=0&page=1&numperpage=100"
-        f"&return_vote_data=0&return_previews=0&return_children=1"
-    )
-    body = urllib.parse.urlencode({"publishedfileids[0]": collection_id}).encode()
-    try:
-        req = urllib.request.Request(
-            url,
-            data=body,
-            headers={
-                "User-Agent": "rwmod/1.0",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-        )
-        with _shared_opener.open(req, timeout=15) as resp:
-            data = json.loads(resp.read())
-    except Exception:
-        return []
+    log = __import__("logging").getLogger(__name__)
 
-    files = data.get("response", {}).get("publishedfiledetails", [])
-    for f in files:
-        children = f.get("children", [])
-        if children:
-            return [str(c.get("publishedfileid", "")) for c in children if c.get("publishedfileid")]
-        # Single item — not a collection or empty collection
-        # Check file_type: 0=item, 2=collection
-        ftype = f.get("file_type", 0)
-        if ftype != 2:
-            _log = __import__("logging").getLogger(__name__)
-            _log.warning(
-                "fetch_collection_children: %s is not a collection (file_type=%s)",
-                collection_id,
-                ftype,
-            )
+    result = _fetch_collection_api(collection_id, "anonymous")
+    if result:
+        return result
+
+    log.warning("Collection %s: API empty, trying HTML scraping", collection_id)
+    result = _scrape_collection_page(collection_id)
+    if result:
+        log.info("Collection %s: found %d mods via HTML scraping", collection_id, len(result))
+        return result
+
+    log.warning("Collection %s: HTML scraping failed, trying user API key", collection_id)
+    try:
+        from rwmod.config import Config
+        cfg = Config.load()
+        if cfg.steam_api_key:
+            result = _fetch_collection_api(collection_id, cfg.steam_api_key)
+            if result:
+                log.info("Collection %s: found %d mods via user API key", collection_id, len(result))
+                return result
+    except Exception:
+        pass
+
+    log.warning("Collection %s: all methods failed", collection_id)
     return []
 
 
+def _fetch_collection_api(collection_id: str, api_key: str = "anonymous") -> list[str]:
+    """Fetch collection children via Steam Web API with pagination."""
+    all_ids = []
+    page = 1
+    per_page = 500
+    while True:
+        url = (
+            f"https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?"
+            f"key={api_key}&format=json&appid={STEAM_APP_ID}"
+            f"&query_type=0&page={page}&numperpage={per_page}"
+            f"&return_vote_data=0&return_previews=0&return_children=1"
+        )
+        body = urllib.parse.urlencode({"publishedfileids[0]": collection_id}).encode()
+        try:
+            req = urllib.request.Request(
+                url, data=body,
+                headers={"User-Agent": "rwmod/1.0", "Content-Type": "application/x-www-form-urlencoded"},
+            )
+            with _shared_opener.open(req, timeout=20) as resp:
+                data = json.loads(resp.read())
+        except Exception:
+            return all_ids if all_ids else []
+
+        files = data.get("response", {}).get("publishedfiledetails", [])
+        found_children = False
+        for f in files:
+            children = f.get("children", [])
+            if children:
+                for c in children:
+                    wid = str(c.get("publishedfileid", ""))
+                    if wid:
+                        all_ids.append(wid)
+                found_children = True
+            ftype = f.get("file_type", 0)
+            if ftype != 2:
+                return []
+
+        total = data.get("response", {}).get("total", 0)
+        if all_ids and len(all_ids) >= total:
+            break
+        if not found_children:
+            break
+        page += 1
+
+    return all_ids
+
+
+def _scrape_collection_page(collection_id: str) -> list[str]:
+    """Scrape the public Steam Community collection page for mod IDs.
+
+    Fallback when API returns empty. Extracts mod IDs from HTML links.
+    """
+    url = f"https://steamcommunity.com/sharedfiles/filedetails/?id={collection_id}"
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        })
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+    except Exception:
+        return []
+
+    ids = []
+    for m in re.finditer(r"/sharedfiles/filedetails/\?id=(\d+)", html):
+        if m.group(1) != collection_id:
+            ids.append(m.group(1))
+
+    seen = set()
+    result = []
+    for i in ids:
+        if i not in seen:
+            seen.add(i)
+            result.append(i)
+    return result
 def fetch_item_details(mod_ids: list[str]) -> dict[str, dict]:
     """Fetch updated timestamp for a batch of mod IDs (used for update detection)."""
     return _fetch_batch(mod_ids)

@@ -155,6 +155,7 @@ class DownloadQueue:
         """Write queue item state to SQLite."""
         try:
             from rwmod.database import queue_upsert
+            import asyncio
 
             queue_upsert(
                 item.id,
