@@ -38,7 +38,7 @@ class Config:
         self.steam_api_key = steam_api_key
 
     @classmethod
-    def load(cls) -> "Config":
+    def load(cls) -> Config:
         builtin = cls._default_steamcmd_path()
         if cls.CONFIG_PATH.exists():
             data = tomllib.loads(cls.CONFIG_PATH.read_text(encoding="utf-8"))

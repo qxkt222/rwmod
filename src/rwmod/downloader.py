@@ -16,8 +16,9 @@ from rwmod.utils import extract_mod_id, safe_filename
 def _try_broadcast() -> None:
     """Notify WebSocket clients of queue changes, if server is running."""
     try:
-        from rwmod.server import broadcast_queue_update
         import asyncio
+
+        from rwmod.server import broadcast_queue_update
         asyncio.create_task(broadcast_queue_update())
     except Exception:
         pass

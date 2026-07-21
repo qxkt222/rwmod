@@ -84,7 +84,11 @@ class RimPyDB:
             if a in ids_set and b in ids_set:
                 conflicts.append({
                     "mod_a": a, "mod_b": b,
-                    "reason": str(rule.get("reason", "") or rule.get("description", "") or "Known conflict"),
+                    "reason": str(
+                    rule.get("reason", "")
+                    or rule.get("description", "")
+                    or "Known conflict"
+                ),
                 })
         return conflicts
 
@@ -131,7 +135,10 @@ class RimPyDB:
             data = json.loads(self._cache_path.read_text(encoding="utf-8"))
             if isinstance(data, dict) and data:
                 self._data = data
-                _log.info("RimPy DB loaded from cache (%d KB)", self._cache_path.stat().st_size // 1024)
+                _log.info(
+            "RimPy DB loaded from cache (%d KB)",
+            self._cache_path.stat().st_size // 1024,
+        )
                 return True
         except (OSError, json.JSONDecodeError) as e:
             _log.debug("RimPy cache read failed: %s", e)
@@ -147,7 +154,10 @@ class RimPyDB:
             if not isinstance(data, dict):
                 return False
             self._cache_dir.mkdir(parents=True, exist_ok=True)
-            self._cache_path.write_text(json.dumps(data, ensure_ascii=False, indent=None), encoding="utf-8")
+            self._cache_path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=None),
+            encoding="utf-8",
+        )
             self._data = data
             _log.info("RimPy DB downloaded (%d KB)", len(raw) // 1024)
             return True

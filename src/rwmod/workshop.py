@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -145,7 +146,11 @@ def fetch_collection_children(collection_id: str) -> list[str]:
         if cfg.steam_api_key:
             result = _fetch_collection_api(collection_id, cfg.steam_api_key)
             if result:
-                log.info("Collection %s: found %d mods via user API key", collection_id, len(result))
+                log.info(
+                    "Collection %s: found %d mods via user API key",
+                    collection_id,
+                    len(result),
+                )
                 return result
     except Exception:
         pass
@@ -170,7 +175,10 @@ def _fetch_collection_api(collection_id: str, api_key: str = "anonymous") -> lis
         try:
             req = urllib.request.Request(
                 url, data=body,
-                headers={"User-Agent": "rwmod/1.0", "Content-Type": "application/x-www-form-urlencoded"},
+                headers={
+                    "User-Agent": "rwmod/1.0",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
             )
             with _shared_opener.open(req, timeout=20) as resp:
                 data = json.loads(resp.read())
