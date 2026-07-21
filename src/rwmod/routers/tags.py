@@ -1,4 +1,4 @@
-﻿"""Tags router \u2014 API for managing mod tags/categories."""
+"""Tags router \u2014 API for managing mod tags/categories."""
 
 from __future__ import annotations
 

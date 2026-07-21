@@ -115,11 +115,6 @@ def is_collection(workshop_id: str) -> bool:
     return False
 
 
-
-
-
-
-
 def fetch_collection_children(collection_id: str) -> list[str]:
     """Fetch all mod IDs in a Steam Workshop collection with 3-layer fallback.
 
@@ -142,6 +137,7 @@ def fetch_collection_children(collection_id: str) -> list[str]:
     log.warning("Collection %s: HTML scraping failed, trying user API key", collection_id)
     try:
         from rwmod.config import Config
+
         cfg = Config.load()
         if cfg.steam_api_key:
             result = _fetch_collection_api(collection_id, cfg.steam_api_key)
@@ -174,7 +170,8 @@ def _fetch_collection_api(collection_id: str, api_key: str = "anonymous") -> lis
         body = urllib.parse.urlencode({"publishedfileids[0]": collection_id}).encode()
         try:
             req = urllib.request.Request(
-                url, data=body,
+                url,
+                data=body,
                 headers={
                     "User-Agent": "rwmod/1.0",
                     "Content-Type": "application/x-www-form-urlencoded",
@@ -216,9 +213,10 @@ def _scrape_collection_page(collection_id: str) -> list[str]:
     """
     url = f"https://steamcommunity.com/sharedfiles/filedetails/?id={collection_id}"
     try:
-        req = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        })
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+        )
         with urllib.request.urlopen(req, timeout=30) as resp:
             html = resp.read().decode("utf-8", errors="replace")
     except Exception:
@@ -236,6 +234,8 @@ def _scrape_collection_page(collection_id: str) -> list[str]:
             seen.add(i)
             result.append(i)
     return result
+
+
 def fetch_item_details(mod_ids: list[str]) -> dict[str, dict]:
     """Fetch updated timestamp for a batch of mod IDs (used for update detection)."""
     return _fetch_batch(mod_ids)

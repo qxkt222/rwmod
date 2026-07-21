@@ -82,14 +82,17 @@ class RimPyDB:
             a = str(rule.get("a", "") or rule.get("mod_a", "") or rule.get("id1", ""))
             b = str(rule.get("b", "") or rule.get("mod_b", "") or rule.get("id2", ""))
             if a in ids_set and b in ids_set:
-                conflicts.append({
-                    "mod_a": a, "mod_b": b,
-                    "reason": str(
-                    rule.get("reason", "")
-                    or rule.get("description", "")
-                    or "Known conflict"
-                ),
-                })
+                conflicts.append(
+                    {
+                        "mod_a": a,
+                        "mod_b": b,
+                        "reason": str(
+                            rule.get("reason", "")
+                            or rule.get("description", "")
+                            or "Known conflict"
+                        ),
+                    }
+                )
         return conflicts
 
     def get_load_rules(self, workshop_ids: set[str]) -> list[dict]:
@@ -106,12 +109,14 @@ class RimPyDB:
             if mid in ids_set or any(
                 str(x) in ids_set for x in rule.get("before", []) + rule.get("after", [])
             ):
-                result.append({
-                    "mod_id": mid,
-                    "before": [str(x) for x in rule.get("before", [])],
-                    "after": [str(x) for x in rule.get("after", [])],
-                    "note": str(rule.get("note", "")),
-                })
+                result.append(
+                    {
+                        "mod_id": mid,
+                        "before": [str(x) for x in rule.get("before", [])],
+                        "after": [str(x) for x in rule.get("after", [])],
+                        "note": str(rule.get("note", "")),
+                    }
+                )
         return result
 
     def search_by_workshop_id(self, workshop_id: str) -> dict | None:
@@ -136,9 +141,9 @@ class RimPyDB:
             if isinstance(data, dict) and data:
                 self._data = data
                 _log.info(
-            "RimPy DB loaded from cache (%d KB)",
-            self._cache_path.stat().st_size // 1024,
-        )
+                    "RimPy DB loaded from cache (%d KB)",
+                    self._cache_path.stat().st_size // 1024,
+                )
                 return True
         except (OSError, json.JSONDecodeError) as e:
             _log.debug("RimPy cache read failed: %s", e)
@@ -155,9 +160,9 @@ class RimPyDB:
                 return False
             self._cache_dir.mkdir(parents=True, exist_ok=True)
             self._cache_path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=None),
-            encoding="utf-8",
-        )
+                json.dumps(data, ensure_ascii=False, indent=None),
+                encoding="utf-8",
+            )
             self._data = data
             _log.info("RimPy DB downloaded (%d KB)", len(raw) // 1024)
             return True

@@ -1,4 +1,4 @@
-﻿"""RimWorld save file (.rws) parser \u2014 extract mod requirements from save games.
+"""RimWorld save file (.rws) parser \u2014 extract mod requirements from save games.
 
 A RimWorld save file is XML-based and contains a <modIds> section listing all
 packageIds active when the save was created. This module extracts that list

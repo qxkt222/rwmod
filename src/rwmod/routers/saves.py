@@ -1,4 +1,4 @@
-﻿"""Save file analysis router \u2014 parse .rws files to detect mod requirements."""
+"""Save file analysis router \u2014 parse .rws files to detect mod requirements."""
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
@@ -18,14 +18,16 @@ def list_saves(cfg: Config = Depends(get_config)):
     results = []
     for sp in saves[:50]:
         analysis = analyze_save(sp, installed)
-        results.append({
-            "name": analysis["name"],
-            "game_version": analysis["game_version"],
-            "total_mods": analysis["total_mods"],
-            "missing_count": len(analysis["missing_mods"]),
-            "loadable": analysis["loadable"],
-            "completeness": analysis["completeness"],
-        })
+        results.append(
+            {
+                "name": analysis["name"],
+                "game_version": analysis["game_version"],
+                "total_mods": analysis["total_mods"],
+                "missing_count": len(analysis["missing_mods"]),
+                "loadable": analysis["loadable"],
+                "completeness": analysis["completeness"],
+            }
+        )
     return {"saves": results}
 
 

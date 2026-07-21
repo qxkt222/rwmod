@@ -69,4 +69,3 @@ def onboarding_check():
     ]
     all_done = all(s["done"] for s in steps)
     return {"steps": steps, "all_done": all_done}
-

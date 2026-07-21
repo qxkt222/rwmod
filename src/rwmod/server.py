@@ -59,6 +59,7 @@ async def lifespan(app: FastAPI):
     set_gauge("steam_online", True)
     # Seed app state (future: migrate singletons here)
     from rwmod.app_state import AppState
+
     app.state.rwmod = AppState()
     yield
     await au.stop_background()

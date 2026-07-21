@@ -24,7 +24,6 @@ _request_stats: dict[str, dict] = defaultdict(lambda: {"count": 0, "total_ms": 0
 # Active operations
 
 
-
 def record_request(request: Request, status_code: int, elapsed_ms: float) -> None:
     """Record request metrics. Called from server middleware."""
     key = f"{request.method} {request.url.path}"
@@ -100,13 +99,35 @@ def metrics():
             lines.append(f'rwmod_errors_total{{method="{method}",path="{path}"}} {stats["errors"]}')
 
     gauges = [
-        ("rwmod_active_downloads", "Currently active downloads", "gauge", _GAUGE_STORE["active_downloads"]),
+        (
+            "rwmod_active_downloads",
+            "Currently active downloads",
+            "gauge",
+            _GAUGE_STORE["active_downloads"],
+        ),
         ("rwmod_mod_count", "Installed mod count", "gauge", _GAUGE_STORE["mod_count"]),
-        ("rwmod_disk_usage_mb", "Mod directory disk usage in MB", "gauge", f"{_GAUGE_STORE['disk_usage_mb']:.1f}"),
-        ("rwmod_queue_depth", "Pending + downloading queue items", "gauge", _GAUGE_STORE["queue_depth"]),
-        ("rwmod_steam_api_up", "Steam API reachable (1=yes, 0=no)", "gauge", 1 if _GAUGE_STORE["steam_online"] else 0),
+        (
+            "rwmod_disk_usage_mb",
+            "Mod directory disk usage in MB",
+            "gauge",
+            f"{_GAUGE_STORE['disk_usage_mb']:.1f}",
+        ),
+        (
+            "rwmod_queue_depth",
+            "Pending + downloading queue items",
+            "gauge",
+            _GAUGE_STORE["queue_depth"],
+        ),
+        (
+            "rwmod_steam_api_up",
+            "Steam API reachable (1=yes, 0=no)",
+            "gauge",
+            1 if _GAUGE_STORE["steam_online"] else 0,
+        ),
     ]
     for name, help_text, mtype, value in gauges:
-        lines.extend(["", f"# HELP {name} {help_text}", f"# TYPE {name} {mtype}", f"{name} {value}"])
+        lines.extend(
+            ["", f"# HELP {name} {help_text}", f"# TYPE {name} {mtype}", f"{name} {value}"]
+        )
 
     return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain")

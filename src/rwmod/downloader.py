@@ -19,9 +19,11 @@ def _try_broadcast() -> None:
         import asyncio
 
         from rwmod.server import broadcast_queue_update
+
         asyncio.create_task(broadcast_queue_update())
     except Exception:
         pass
+
 
 __all__ = ["download_one", "extract_mod_id", "_find_existing", "_pick_folder_name"]
 

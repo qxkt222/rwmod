@@ -32,14 +32,16 @@ def _cached_mod_list(cfg: Config) -> list[dict]:
         mod_dir = cfg.mods_dir / m.folder
         size_mb = _get_dir_size_mb(mod_dir)
         tags = get_tags(m.folder)
-        data.append({
-            "folder": m.folder,
-            "name": m.name,
-            "package_id": m.package_id,
-            "workshop_id": m.workshop_id,
-            "size_mb": size_mb,
-            "tags": tags,
-        })
+        data.append(
+            {
+                "folder": m.folder,
+                "name": m.name,
+                "package_id": m.package_id,
+                "workshop_id": m.workshop_id,
+                "size_mb": size_mb,
+                "tags": tags,
+            }
+        )
     _mods_cache["data"] = data
     _mods_cache["_ts"] = now
     return data

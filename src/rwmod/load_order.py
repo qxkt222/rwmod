@@ -189,10 +189,12 @@ def _check_known_conflicts(order: list[str], mods_dir: Path, issues: list[dict])
         if active_wids and db.ensure_loaded():
             db_conflicts = db.get_conflicts(active_wids)
             for c in db_conflicts:
-                issues.append({
-                    "severity": "error",
-                    "message": f"⚠ {c['reason']}",
-                })
+                issues.append(
+                    {
+                        "severity": "error",
+                        "message": f"⚠ {c['reason']}",
+                    }
+                )
             if db_conflicts:
                 return  # Use DB results, skip hardcoded fallback
     except Exception:
@@ -203,10 +205,12 @@ def _check_known_conflicts(order: list[str], mods_dir: Path, issues: list[dict])
         a_found = [i for i, p in enumerate(pid_lower) if a_keyword in p]
         b_found = [i for i, p in enumerate(pid_lower) if b_keyword in p]
         if a_found and b_found:
-            issues.append({
-                "severity": "error",
-                "message": f"⚠ {reason}",
-            })
+            issues.append(
+                {
+                    "severity": "error",
+                    "message": f"⚠ {reason}",
+                }
+            )
 
 
 def _check_duplicates(order: list[str], issues: list[dict]) -> None:
